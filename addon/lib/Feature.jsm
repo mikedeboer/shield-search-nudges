@@ -15,6 +15,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "clearInterval",
   "resource://gre/modules/Timer.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "setInterval",
   "resource://gre/modules/Timer.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "LaterRun",
+  "resource:///modules/LaterRun.jsm");
 
 const EXPORTED_SYMBOLS = ["Feature"];
 const NUDGES_SHOWN_COUNT_MAX = 4;
@@ -91,7 +93,6 @@ class Feature {
     this.log = log;
     this.libPath = libPath;
     this.frameScript = `${this.libPath}/shield-search-nudges-content.js`;
-    this.shownPanelType = null;
   }
 
   /**
@@ -261,7 +262,6 @@ class Feature {
         if (window.gURLBar.focused && focusMethod && !!(focusMethod & Services.focus.FLAG_BYMOUSE)) {
           Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, true);
         }
-        this.shownPanelType = null;
         break;
       }
       default:
@@ -362,6 +362,12 @@ class Feature {
       return;
     }
 
+    if (LaterRun.enabled && LaterRun.sessionCount == 1 && LaterRun.hoursSinceInstall <= 1) {
+      // Do not show the tip when this is the very first session in a newly
+      // created profile.
+      return;
+    }
+
     const engine = Services.search.currentEngine;
     const [button, content] = await this._getStrings(window, type, engine);
 
@@ -377,7 +383,6 @@ class Feature {
 
     panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
     panel.addEventListener("popuphidden", this, {once: true});
-    this.shownPanelType = type;
 
     // Increment the counter that keeps track of the number of times this popup
     // was shown.
