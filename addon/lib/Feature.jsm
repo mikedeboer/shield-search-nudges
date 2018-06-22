@@ -6,7 +6,7 @@
 
 /* eslint no-unused-vars: ["error", { "varsIgnorePattern": "(EXPORTED_SYMBOLS|Feature)" }]*/
 
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.importGlobalProperties(["fetch"]);
 
 Cu.import("resource://gre/modules/Services.jsm");
@@ -93,6 +93,7 @@ class Feature {
     this.log = log;
     this.libPath = libPath;
     this.frameScript = `${this.libPath}/shield-search-nudges-content.js`;
+    this.shownPanelType = null;
   }
 
   /**
@@ -241,6 +242,7 @@ class Feature {
   }
 
   handleEvent(event) {
+    const eventPrefix = this.shownPanelType ? this.shownPanelType + "-" : "";
     switch (event.type) {
       case "command": {
         // 'Okay, got it' button was clicked.
@@ -252,6 +254,7 @@ class Feature {
         // Hide the panel when the button is clicked.
         if (panel && panel.hidePopup) {
           panel.hidePopup();
+          this.telemetry({event: eventPrefix + "hidden-buttonclick"});
         }
         break;
       }
@@ -261,7 +264,11 @@ class Feature {
         const focusMethod = Services.focus.getLastFocusMethod(window);
         if (window.gURLBar.focused && focusMethod && !!(focusMethod & Services.focus.FLAG_BYMOUSE)) {
           Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, true);
+          this.telemetry({event: eventPrefix + "hidden-awesomebarclick"});
+        } else {
+          this.telemetry({event: eventPrefix + "hidden"});
         }
+        this.shownPanelType = null;
         break;
       }
       default:
@@ -316,6 +323,7 @@ class Feature {
   maybeShowGeneralTip() {
     const window = this._getWindowIfNotExpired();
     if (!window) {
+      this.telemetry({event: "general-notshown-nobrowserwindow"});
       return;
     }
 
@@ -325,6 +333,7 @@ class Feature {
   maybeShowRedirectTip() {
     const window = this._getWindowIfNotExpired();
     if (!window) {
+      this.telemetry({event: "redirect-notshown-nobrowserwindow"});
       return;
     }
 
@@ -359,12 +368,14 @@ class Feature {
   async _showTip(window, type) {
     const anchor = window.document.querySelector(TIP_ANCHOR_SELECTOR);
     if (!anchor) {
+      this.telemetry({event: type + "-notshown-missinganchor"});
       return;
     }
 
     if (LaterRun.enabled && LaterRun.sessionCount == 1 && LaterRun.hoursSinceInstall <= 1) {
       // Do not show the tip when this is the very first session in a newly
       // created profile.
+      this.telemetry({event: type + "-notshown-freshprofile"});
       return;
     }
 
@@ -373,6 +384,7 @@ class Feature {
 
     const {panel, panelImage, panelDescription, panelButton} = this._ensurePanel(window);
     if (panel.state == "showing" || panel.state == "open") {
+      this.telemetry({event: type + "-notshown-alreadyshown"});
       return;
     }
 
@@ -383,11 +395,14 @@ class Feature {
 
     panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
     panel.addEventListener("popuphidden", this, {once: true});
+    this.shownPanelType = type;
 
     // Increment the counter that keeps track of the number of times this popup
     // was shown.
     Services.prefs.setIntPref(PREF_NUDGES_SHOWN_COUNT,
       Services.prefs.getIntPref(PREF_NUDGES_SHOWN_COUNT, 0) + 1);
+
+    this.telemetry({event: type + "-shown"});
   }
 
   /**
