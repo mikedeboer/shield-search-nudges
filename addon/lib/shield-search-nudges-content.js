@@ -1,4 +1,4 @@
-/* global content, sendAsyncMessage, Services */
+/* eslint-env mozilla/frame-script */
 
 const global = this;
 const {utils: Cu} = Components;
@@ -19,7 +19,7 @@ var ShieldSearchNudges = {
         this.checkDocument();
         break;
       default:
-        Components.utils.reportError("ShieldSearchNudges: unknown event.");
+        Cu.reportError("ShieldSearchNudges: unknown event.");
         break;
     }
   },
@@ -31,7 +31,7 @@ var ShieldSearchNudges = {
         this.checkDocument();
         break;
       default:
-        Components.utils.reportError("ShieldSearchNudges: unknown message.");
+        Cu.reportError("ShieldSearchNudges: unknown message.");
         break;
     }
   },
@@ -40,6 +40,9 @@ var ShieldSearchNudges = {
     if (!this.currentEngineOrigin) {
       return;
     }
+    // right-trim any superfluous trailing URL part that may be entered by accident,
+    // but will still load as the search engine homepage.
+    // Examples: https://www.google.com//, https://www.bing.com/?#
     const url = global.content && global.content.document.documentURI.replace(/[\\/?#]+$/, "");
     if (url == "about:home" || url == "about:newtab") {
       sendAsyncMessage("ShieldSearchNudges:OnHomePage");
