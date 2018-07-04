@@ -92,7 +92,7 @@ class Feature {
     this.reasonName = reasonName;
     this.log = log;
     this.libPath = libPath;
-    this.frameScript = `${this.libPath}/shield-search-nudges-content.js`;
+    this.frameScript = `${this.libPath}/shield-search-nudges-content.js?` + Math.random();
     this.shownPanelType = null;
   }
 
@@ -208,6 +208,7 @@ class Feature {
     // Unload the frame script.
     mm.loadFrameScript("data,:!!ShieldSearchNudges && ShieldSearchNudges.deinit();" +
       "ShieldSearchNudges = null; Components.utils.forceGC();", true);
+    mm.removeDelayedFrameScript(this.frameScript);
     try {
       Services.obs.removeObserver(this, SEARCH_ENGINE_TOPIC);
     } catch (ex) {}
@@ -223,10 +224,10 @@ class Feature {
   receiveMessage(message) {
     switch (message.name) {
       case "ShieldSearchNudges:OnEnginePage":
-        this.maybeShowRedirectTip();
+        this.maybeShowTip("redirect");
         break;
       case "ShieldSearchNudges:OnHomePage":
-        this.maybeShowGeneralTip();
+        this.maybeShowTip("general");
         break;
       default:
         Cu.reportError("ShieldSearchNudges: unknown message name.");
@@ -320,52 +321,32 @@ class Feature {
     this.studyUtils.telemetry(stringStringMap);
   }
 
-  maybeShowGeneralTip() {
-    const window = this._getWindowIfNotExpired();
-    if (!window) {
-      this.telemetry({event: "general-notshown-nobrowserwindow"});
-      return;
-    }
-
-    this._showTip(window, "general");
-  }
-
-  maybeShowRedirectTip() {
-    const window = this._getWindowIfNotExpired();
-    if (!window) {
-      this.telemetry({event: "redirect-notshown-nobrowserwindow"});
-      return;
-    }
-
-    this._showTip(window, "redirect");
-  }
-
   /**
-   * Helper method to retrieve the currently focused browser window, but only
-   * when the study hasn't expired yet.
-   * IF it's expired, take care of ending study here during browser runtime.
+   * Show the panel with a specific onboarding tip, except when the following
+   * conditions are encountered:
+   *  - Study has expired,
+   *  - No browser window could be found,
+   *  - The panel anchor element could not be found,
+   *  - A fresh profile was detected, which means that the user just installed the browser,
+   *  - The panel is already open.
    *
-   * @return {DOMWindow}
+   * @param {String} type The tip to display; may be 'general' or 'redirect'
    */
-  _getWindowIfNotExpired() {
+  async maybeShowTip(type) {
     if (this.hasExpired()) {
+      this.telemetry({event: type + "-notshown-expired"});
       this.studyUtils.endStudy({reason: "expired"});
-      return null;
+      return;
     }
 
     // `getFocusedBrowserWindow` may return `null` when the focused window is
     // _not_ a browser window, but that's ok - in that case we don't want to show
     // a tip (or nudge) anyway.
-    return getFocusedBrowserWindow();
-  }
+    const window = getBrowserWindow();
+    if (!window) {
+      this.telemetry({event: type + "-notshown-nobrowserwindow"});
+    }
 
-  /**
-   * Show the panel with a specific onboarding tip.
-   *
-   * @param {DOMWindow} window The currently focused window
-   * @param {String}    type   The tip to display; may be 'general' or 'redirect'
-   */
-  async _showTip(window, type) {
     const anchor = window.document.querySelector(TIP_ANCHOR_SELECTOR);
     if (!anchor) {
       this.telemetry({event: type + "-notshown-missinganchor"});
