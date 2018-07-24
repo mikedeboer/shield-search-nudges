@@ -67,6 +67,20 @@ var config = {
     return true;
   },
 
+  /* Nudge study branches and weights
+     - test kittens vs. puppies if we can only have one.
+  */
+  weightedVariations: [
+    {
+      name: "doshow",
+      weight: 1,
+    },
+    {
+      name: "noshow",
+      weight: 1,
+    },
+  ],
+
   // Optional: relative to bootstrap.js in the xpi
   studyUtilsPath: `./StudyUtils.jsm`,
 };
