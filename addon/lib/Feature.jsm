@@ -17,6 +17,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "setInterval",
   "resource://gre/modules/Timer.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LaterRun",
   "resource:///modules/LaterRun.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+  "resource:///modules/sessionstore/SessionStore.jsm");
 
 const EXPORTED_SYMBOLS = ["Feature"];
 const NUDGES_SHOWN_COUNT_MAX = 4;
@@ -87,7 +89,8 @@ class Feature {
    *  - reasonName: string of bootstrap.js startup/shutdown reason
    *
    */
-  constructor(studyUtils, reasonName, log, libPath) {
+  constructor(variation, studyUtils, reasonName, log, libPath) {
+    this.variation = variation;
     this.studyUtils = studyUtils;
     this.reasonName = reasonName;
     this.log = log;
@@ -125,6 +128,7 @@ class Feature {
       this.resetPrefs();
     }
 
+    await SessionStore.promiseAllWindowsRestored;
     await this.loadFrameScript();
     await this.connectWithSearch();
   }
@@ -342,7 +346,7 @@ class Feature {
     // `getFocusedBrowserWindow` may return `null` when the focused window is
     // _not_ a browser window, but that's ok - in that case we don't want to show
     // a tip (or nudge) anyway.
-    const window = getBrowserWindow();
+    const window = await getBrowserWindow();
     if (!window) {
       this.telemetry({event: type + "-notshown-nobrowserwindow"});
     }
@@ -369,14 +373,18 @@ class Feature {
       return;
     }
 
-    panelImage.src = engine.iconURI.spec;
-    panelDescription.textContent = content;
-    panelButton.setAttribute("label", button);
-    panel.hidden = false;
+    // Show the panel only if we've got the right study variation set to do so.
+    // If it's set to 'noshow', it means that this user is in the control group.
+    if (this.variation.name == "doshow") {
+      panelImage.src = engine.iconURI.spec;
+      panelDescription.textContent = content;
+      panelButton.setAttribute("label", button);
+      panel.hidden = false;
 
-    panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
-    panel.addEventListener("popuphidden", this, {once: true});
-    this.shownPanelType = type;
+      panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
+      panel.addEventListener("popuphidden", this, {once: true});
+      this.shownPanelType = type;
+    }
 
     // Increment the counter that keeps track of the number of times this popup
     // was shown.
@@ -457,7 +465,10 @@ class Feature {
 
     const panelBody = panel.appendChild(document.createElement("vbox"))
       .appendChild(document.createElement("hbox"));
+    // Prevent stretching the image:
+    panelBody.setAttribute("style", "-moz-box-align: start");
     const panelImage = panelBody.appendChild(document.createElement("image"));
+    panelImage.setAttribute("style", "margin-inline-end: 8px");
     const panelDescription = panelBody.appendChild(document.createElement("vbox"))
       .appendChild(document.createElement("description"));
     const panelButton = panelBody.parentNode.appendChild(document.createElement("button"));

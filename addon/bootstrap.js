@@ -31,6 +31,13 @@ XPCOMUtils.defineLazyModuleGetter(
 
 this.Bootstrap = {
   /**
+   * Change this preference to test the add-on behavior in different study
+   * variations/branches (or leave it unset to use the automatic assigning
+   * of a study variation/branch from weightedVariations in Config.jsm)
+   */
+  VARIATION_OVERRIDE_PREF: "extensions.shield-search-nudges.variation",
+
+  /**
    * Use console as our logger until there is a log() method in studyUtils that we can rely on
    */
   log: console,
@@ -44,6 +51,10 @@ this.Bootstrap = {
     this.log.debug("startup", studyUtils.REASONS[reason] || reason);
 
     this.initStudyUtils(addonData.id, addonData.version);
+
+    // Choose and set variation.
+    const variation = await this.selectVariation();
+    this.variation = variation;
 
     // Check if the user is eligible to run this study using the |isEligible|
     // function when the study is initialized
@@ -72,6 +83,7 @@ this.Bootstrap = {
 
     // initiate the chrome-privileged part of the study add-on
     this.feature = new Feature(
+      variation,
       studyUtils,
       studyUtils.REASONS[reason],
       this.log,
@@ -98,6 +110,33 @@ this.Bootstrap = {
       name: "default",
       weight: 0
     });
+  },
+
+  // choose the variation for this particular user, then set it.
+  async selectVariation() {
+    const variation =
+      this.getVariationFromPref(config.weightedVariations) ||
+      (await studyUtils.deterministicVariation(config.weightedVariations));
+    studyUtils.setVariation(variation);
+    this.log.debug(`studyUtils has config and variation.name: ${variation.name}.
+      Ready to send telemetry`);
+    return variation;
+  },
+
+  // helper to let Dev or QA set the variation name
+  getVariationFromPref(weightedVariations) {
+    const name = Services.prefs.getCharPref(this.VARIATION_OVERRIDE_PREF, "");
+    if (name !== "") {
+      const variation = weightedVariations.filter(x => x.name === name)[0];
+      if (!variation) {
+        throw new Error(`about:config => ${
+          this.VARIATION_OVERRIDE_PREF
+        } set to ${name},
+          but no variation with that name exists.`);
+      }
+      return variation;
+    }
+    return name;
   },
 
   /**
