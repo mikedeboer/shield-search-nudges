@@ -11,86 +11,60 @@
 * (Create profile: <https://developer.mozilla.org/Firefox/Multiple_profiles>, or via some other method)
 * Navigate to _about:config_ and set the following preferences. (If a preference does not exist, create it be right-clicking in the white area and selecting New -> String or Integer depending on the type of preference)
 * Set `extensions.legacy.enabled` to `true`. This permits the loading of the embedded Web Extension since new versions of Firefox are becoming restricted to pure Web Extensions only.
-* Set `extensions.button_icon_preference.variation` to `kitten` (or any other study variation/branch to test specifically)
+* Set `extensions.shield-search-nudges.variation` to one of:
+  * `doshow` - The panel is shown to the user.
+  * `noshow` - The panel is not shown to the user, however some telemetry is still logged (the telemetry for hiding the panel cannot be logged as it isn't shown).
 * Go to [this study's tracking bug](tbd: replace with your study's launch bug link in bugzilla) and install the latest signed XPI
 
 ## Expected User Experience / Functionality
 
-Users see:
+When the following conditions are met:
 
-* an icon in the browser address bar (webExtension BrowserAction) with one of 3 images (Cat, Dog, Lizard)
+* the user is not in the first session after the add-on is installed.
+* the user visits one of: `about:home`, `about:newtab` or the current search engine start page
 
-Clicking on the button:
+Then:
 
-* changes the badge
-* sends telemetry
+* A doorhanger prompt will be shown once per session.
+  * For `about:home` or `about:newtab`, the doorhanger will read "Type less, find more: Search %S right from your address bar."
+  * For the current search engine page it will read "Start your search here to see suggestions from %S and your browsing history."
 
-ONCE ONLY users see:
+The doorhanger will stop being shown (and the study will end) when one of the following is met:
 
-* a notification bar, introducing the featur
-* allowing them to opt out
+* The user clicks on the "Okay, got it" button
+* The user clicks in the address bar whilst the doorhanger is displayed
+* The doorhanger has been displayed a total of four times.
 
-Icon will be the same every run.
-
-If the user clicks on the badge more than 3 times, it ends the study.
+If the study branch is `noshow`, then the doorhanger will not be shown, however telemetry will
+still be logged.
 
 ### Do these tests
 
-1. UI APPEARANCE. OBSERVE a notification bar with these traits:
+1. A doorhanger is shown:
 
-   * Icon is 'heartbeat'
-   * Text is one of 8 selected "questions", such as: "Do you like Firefox?". These are listed in [/addon/Config.jsm](/addon/Config.jsm) as the variable `weightedVariations`.
-   * clickable buttons with labels 'yes | not sure | no' OR 'no | not sure | yes' (50/50 chance of each)
-   * an `x` button at the right that closes the notice.
+   * Once per session
+   * Only when `about:home` or `about:newtab`, or the current search engine page is shown
+   * Only when no other dialog nor doorhanger is shown (e.g. default browser dialog)
+   * Up to a maximum of four times (dismiss the doorhanger by clicking out of it and outside of the address bar)
 
    Test fails IF:
 
-   * there is no bar.
-   * elements are not correct or are not displaye
+   * A doorhanger is shown in the first session after installation
+   * It is shown more than four times
+   * It is displayed when it is not meant to be
+   * Doorhanger is shown with the wrong text (see above)
 
-2. UI functionality: VOTE
+2. A doorhanger stops being shown when the "Okay, got it" button is pressed
 
-   Expect: Click on a 'vote' button (any of: `yes | not sure | no`) has all these effects
+   Test fails IF:
 
-   * notice closes
-   * add-on uninstalls
-   * no additional tabs open
-   * telemetry pings are 'correct' with this SPECIFIC `study_state` as the ending
+   * The doorhanger continues to be displayed after clicking the button.
 
-     * ending is `voted`
-     * 'vote' is correct.
+3. A doorhanger stops being shown when the user clicks within the address bar whilst the doorhanger is being shown
 
-3. UI functionality: 'X' button
+   Test fails IF:
 
-   Click on the 'x' button.
-
-   * notice closes
-   * add-on uninstalls
-   * no additional tabs open
-   * telemetry pings are 'correct' with this SPECIFIC ending
-
-     * ending is `notification-x`
-
-4. UI functionality 'close window'
-
-   1. Open a 2nd Firefox window.
-   2. Close the initial window.
-
-   Then observe:
-
-   * notice closes
-   * add-on uninstalls
-   * no additional tabs open
-   * telemetry pings are 'correct' with this SPECIFIC ending
-
-     * ending is `window-or-fx-closed`
-
-5. UI functionality 'too-popular'
-
-   * Click on the web extension's icon three times
-   * Verify that the study ends
-   * Verify that sent Telemetry is correct
-   * Verify that the user is sent to the URL specified in `addon/Config.jsm` under `endings -> too-popular`.
+   * The doorhanger continues to be displayed after clicking in the address bar
 
 ### Design
 
@@ -111,23 +85,24 @@ To debug installation and loading of the add-on:
 Example log output after installing the add-on:
 
 ```
-install 5  bootstrap.js:125
-startup ADDON_INSTALL  bootstrap.js:33
-info {"studyName":"mostImportantExperiment","addon":{"id":"template-shield-study@mozilla.com","version":"1.0.0"},"variation":{"name":"kittens"},"shieldId":"8bb19b5c-99d0-cc48-ba95-c73f662bd9b3"}  bootstrap.js:67
-1508111525396	shield-study-utils	DEBUG	log made: shield-study-utils
-1508111525398	shield-study-utils	DEBUG	setting up!
-1508111525421	shield-study-utils	DEBUG	firstSeen
-1508111525421	shield-study-utils	DEBUG	telemetry in:  shield-study {"study_state":"enter"}
-1508111525421	shield-study-utils	DEBUG	getting info
-1508111525423	shield-study-utils	DEBUG	telemetry: {"version":3,"study_name":"mostImportantExperiment","branch":"kittens","addon_version":"1.0.0","shield_version":"4.1.0","type":"shield-study","data":{"study_state":"enter"},"testing":true}
-1508111525430	shield-study-utils	DEBUG	startup 5
-1508111525431	shield-study-utils	DEBUG	getting info
-1508111525431	shield-study-utils	DEBUG	marking TelemetryEnvironment: mostImportantExperiment
-1508111525476	shield-study-utils	DEBUG	telemetry in:  shield-study {"study_state":"installed"}
-1508111525477	shield-study-utils	DEBUG	getting info
-1508111525477	shield-study-utils	DEBUG	telemetry: {"version":3,"study_name":"mostImportantExperiment","branch":"kittens","addon_version":"1.0.0","shield_version":"4.1.0","type":"shield-study","data":{"study_state":"installed"},"testing":true}
-1508111525479	shield-study-utils	DEBUG	getting info
-1508111525686	shield-study-utils	DEBUG	getting info
-1508111525686	shield-study-utils	DEBUG	respondingTo: info
-init kittens  background.js:29:5
+install 5 bootstrap.js:185
+startup ADDON_INSTALL bootstrap.js:51
+studyUtils has config and variation.name: doshow.
+      Ready to send telemetry bootstrap.js:121
+info {"studyName":"searchNudgesExperiment","addon":{"id":"search-nudges@shield.mozilla.org","version":"1.3.0"},"variation":{"name":"doshow","weight":1},"shieldId":""} bootstrap.js:82
+Feature start Feature.jsm:124  1533304648312	shield-study-utils	DEBUG	log made: shield-study-utils
+1533304648312	shield-study-utils	DEBUG	setting up!
+1533304648335	shield-study-utils	DEBUG	firstSeen
+1533304648335	shield-study-utils	DEBUG	telemetry in:  shield-study {"study_state":"enter"}
+1533304648337	shield-study-utils	DEBUG	telemetry: {"version":3,"study_name":"searchNudgesExperiment","branch":"doshow","addon_version":"1.3.0","shield_version":"4.1.0","type":"shield-study","data":{"study_state":"enter"},"testing":true}
+1533304648342	shield-study-utils	DEBUG	startup 5
+1533304648342	shield-study-utils	DEBUG	marking TelemetryEnvironment: searchNudgesExperiment
+1533304648343	shield-study-utils	DEBUG	telemetry in:  shield-study {"study_state":"installed"}
+1533304648343	shield-study-utils	DEBUG	telemetry: {"version":3,"study_name":"searchNudgesExperiment","branch":"doshow","addon_version":"1.3.0","shield_version":"4.1.0","type":"shield-study","data":{"study_state":"installed"},"testing":true}
+1533304648482	shield-study-utils	DEBUG	telemetry {"event":"general-shown"}
+1533304648482	shield-study-utils	DEBUG	telemetry in:  shield-study-addon {"attributes":{"event":"general-shown"}}
+1533304648485	shield-study-utils	DEBUG	telemetry: {"version":3,"study_name":"searchNudgesExperiment","branch":"doshow","addon_version":"1.3.0","shield_version":"4.1.0","type":"shield-study-addon","data":{"attributes":{"event":"general-shown"}},"testing":true}
+1533304658726	shield-study-utils	DEBUG	telemetry {"event":"general-hidden"}
+1533304658726	shield-study-utils	DEBUG	telemetry in:  shield-study-addon {"attributes":{"event":"general-hidden"}}
+1533304658727	shield-study-utils	DEBUG	telemetry: {"version":3,"study_name":"searchNudgesExperiment","branch":"doshow","addon_version":"1.3.0","shield_version":"4.1.0","type":"shield-study-addon","data":{"attributes":{"event":"general-hidden"}},"testing":true}
 ```
