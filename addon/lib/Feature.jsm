@@ -177,7 +177,7 @@ class Feature {
       this._searchEngineObserverAdded = true;
     }
 
-    this._searchEngineCurrentOrigin = Services.search.currentEngine.getSubmission("").uri.spec;
+    this._searchEngineCurrentOrigin = Services.search.currentEngine.getSubmission("").uri.prePath;
     return this._searchEngineCurrentOrigin;
   }
 
@@ -369,7 +369,7 @@ class Feature {
     const url = documentURI && documentURI.replace(/[\\/?#]+$/, "");
     if (url == "about:home" || url == "about:newtab") {
       this._maybeShowTip("general");
-    } else if (currentEngineOrigin.startsWith(url)) {
+    } else if (currentEngineOrigin == url) {
       this._maybeShowTip("redirect");
     }
   }
