@@ -85,7 +85,6 @@ this.Bootstrap = {
     this.feature = new Feature(
       variation,
       studyUtils,
-      studyUtils.REASONS[reason],
       this.log,
       `chrome://${STUDY}/content/lib`
     );
@@ -98,7 +97,7 @@ this.Bootstrap = {
     }
 
     // start up the chrome-privileged part of the study
-    this.feature.start();
+    this.feature.start(studyUtils.REASONS[reason]);
   },
 
   initStudyUtils(id, version) {
@@ -169,6 +168,7 @@ this.Bootstrap = {
     // or if the study has expired.
     if (this.feature) {
       await this.feature.shutdown(isUninstall);
+      delete this.feature;
     }
 
     // Unload addon-specific modules
