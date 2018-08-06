@@ -59,10 +59,6 @@ All events for when a prompt is attempted to be shown are:
 * `<target>-notshown-alreadyshown`
   * The prompt is already showing.
 
-XXX What about:
-* Post upgrade?
-* Other doorhangers?
-
 All events for when a prompt is shown, and the user does an action are:
 
 * `<target>-hidden-buttonclick`

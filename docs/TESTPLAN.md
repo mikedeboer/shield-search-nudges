@@ -11,15 +11,16 @@
 * (Create profile: <https://developer.mozilla.org/Firefox/Multiple_profiles>, or via some other method)
 * Navigate to _about:config_ and set the following preferences. (If a preference does not exist, create it be right-clicking in the white area and selecting New -> String or Integer depending on the type of preference)
 * Set `extensions.legacy.enabled` to `true`. This permits the loading of the embedded Web Extension since new versions of Firefox are becoming restricted to pure Web Extensions only.
-* Set `extensions.shield-search-nudges.variation` to `doshow` (or any other study variation/branch to test specifically)
+* Set `extensions.shield-search-nudges.variation` to one of:
+  * `doshow` - The panel is shown to the user.
+  * `noshow` - The panel is not shown to the user, however some telemetry is still logged (the telemetry for hiding the panel cannot be logged as it isn't shown).
 * Go to [this study's tracking bug](tbd: replace with your study's launch bug link in bugzilla) and install the latest signed XPI
 
 ## Expected User Experience / Functionality
 
 When the following conditions are met:
 
-* the user is not in a first session of a new installation
-* the user is not in the first session after upgrade (TBD)
+* the user is not in the first session after the add-on is installed.
 * the user visits one of: `about:home`, `about:newtab` or the current search engine start page
 
 Then:
@@ -43,13 +44,12 @@ still be logged.
 
    * Once per session
    * Only when `about:home` or `about:newtab`, or the current search engine page is shown
-   * Only when no other dialog nor doorhanger is shown
+   * Only when no other dialog nor doorhanger is shown (e.g. default browser dialog)
    * Up to a maximum of four times (dismiss the doorhanger by clicking out of it and outside of the address bar)
 
    Test fails IF:
 
-   * A doorhanger is shown in the first session for a new profile
-   * TBD: A doorhanger is not shown in the first session after an upgrade
+   * A doorhanger is shown in the first session after installation
    * It is shown more than four times
    * It is displayed when it is not meant to be
    * Doorhanger is shown with the wrong text (see above)
