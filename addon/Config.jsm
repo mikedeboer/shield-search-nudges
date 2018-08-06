@@ -67,9 +67,7 @@ var config = {
     return true;
   },
 
-  /* Nudge study branches and weights
-     - test kittens vs. puppies if we can only have one.
-  */
+  // Nudge study branches and weights
   weightedVariations: [
     {
       name: "doshow",
