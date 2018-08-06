@@ -87,6 +87,7 @@ class Feature {
     this._listenersAdded = false;
     this._searchEngineObserverAdded = false;
     this._searchEngineCurrentOrigin = "";
+    this._startingUp = true;
   }
 
   /**
@@ -129,20 +130,26 @@ class Feature {
     // displaying the default browser prompt.
     await SessionStore.promiseAllWindowsRestored;
 
-    Services.tm.idleDispatchToMainThread(() => {
-      // Listen for new windows being opened
-      Services.ww.registerNotification(this);
+    // Listen for new windows being opened
+    Services.ww.registerNotification(this);
 
-      const winEnum = Services.wm.getEnumerator("navigator:browser");
-      while (winEnum.hasMoreElements()) {
-        const win = winEnum.getNext();
-        if (win.closed) {
-          continue;
-        }
-        this._addListenersForWindow(win);
+    this._startingUp = true;
+
+    const winEnum = Services.wm.getEnumerator("navigator:browser");
+    while (winEnum.hasMoreElements()) {
+      const win = winEnum.getNext();
+      if (win.closed) {
+        continue;
       }
-      this._listenersAdded = true;
+      this._addListenersForWindow(win);
+    }
+    this._listenersAdded = true;
 
+    Services.tm.idleDispatchToMainThread(() => {
+      // We can't reliably check what is being loaded at startup in the main tab.
+      // Hence, we let the listeners detect what is being loaded, and then check
+      // once we've finished starting.
+      this._startingUp = false;
       this._checkDisplayOnFirstStartup();
     });
   }
@@ -344,10 +351,9 @@ class Feature {
       }
     }
 
-    const topWindow = Services.wm.getMostRecentWindow("navigator:browser");
-    if (topWindow && topWindow.gBrowser && topWindow.gBrowser.selectedBrowser &&
-        topWindow.gBrowser.selectedBrowser.spec) {
-      this._checkDocument(topWindow.gBrowser.selectedBrowser.spec);
+    if (this._showOnceStarted) {
+      this._maybeShowTip(this._showOnceStarted);
+      delete this._showOnceStarted;
     }
   }
 
@@ -411,6 +417,11 @@ class Feature {
    * @param {String} type The tip to display; may be 'general' or 'redirect'
    */
   async _maybeShowTip(type) {
+    if (this._startingUp) {
+      this._showOnceStarted = type;
+      return;
+    }
+
     if (this.hasExpired()) {
       this.telemetry({event: type + "-notshown-expired"});
       this.studyUtils.endStudy({reason: "expired"});
