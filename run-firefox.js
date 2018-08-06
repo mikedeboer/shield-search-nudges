@@ -48,7 +48,7 @@ const minimistHandler = {
   "--": true,
 };
 
-(async() => {
+(async () => {
   const minimist = require("minimist");
   const parsedArgs = minimist(process.argv.slice(2), minimistHandler);
   if (parsedArgs.help) {

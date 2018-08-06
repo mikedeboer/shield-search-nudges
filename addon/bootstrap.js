@@ -1,33 +1,18 @@
 "use strict";
 
-/* global config, studyUtils, Feature */
-/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "(startup|shutdown|install|uninstall)" }]*/
-
-const { utils: Cu } = Components;
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(
-  this,
-  "Services",
-  "resource://gre/modules/Services.jsm",
-);
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.defineModuleGetter(this, "Services",
+  "resource://gre/modules/Services.jsm");
 
 const STUDY = "search-nudges";
 
-XPCOMUtils.defineLazyModuleGetter(
-  this,
-  "config",
-  `chrome://${STUDY}/content/Config.jsm`,
-);
-XPCOMUtils.defineLazyModuleGetter(
-  this,
-  "studyUtils",
-  `chrome://${STUDY}/content/StudyUtils.jsm`,
-);
-XPCOMUtils.defineLazyModuleGetter(
-  this,
-  "Feature",
-  `chrome://${STUDY}/content/lib/Feature.jsm`,
-);
+/* global config, studyUtils, Feature */
+ChromeUtils.defineModuleGetter(this, "config",
+  `chrome://${STUDY}/content/Config.jsm`);
+ChromeUtils.defineModuleGetter(this, "studyUtils",
+  `chrome://${STUDY}/content/StudyUtils.jsm`);
+ChromeUtils.defineModuleGetter(this, "Feature",
+  `chrome://${STUDY}/content/lib/Feature.jsm`);
 
 this.Bootstrap = {
   /**

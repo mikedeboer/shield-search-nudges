@@ -8,12 +8,7 @@
 
 module.exports = {
   parserOptions: {
-    ecmaVersion: 8,
     sourceType: "module",
-    ecmaFeatures: {
-      jsx: false,
-      experimentalObjectRestSpread: true,
-    },
   },
   env: {
     es6: true,
@@ -27,7 +22,10 @@ module.exports = {
     "plugin:mozilla/recommended",
   ],
 
-  plugins: ["json", "mozilla"],
+  plugins: [
+    "json",
+    "mozilla"
+  ],
 
   rules: {
     "babel/new-cap": "off",

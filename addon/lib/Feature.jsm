@@ -4,18 +4,16 @@
  * Feature module for the Search Nudges Shield Study.
  **/
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.importGlobalProperties(["fetch"]);
 
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "clearInterval",
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.defineModuleGetter(this, "clearInterval",
   "resource://gre/modules/Timer.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "setInterval",
+ChromeUtils.defineModuleGetter(this, "setInterval",
   "resource://gre/modules/Timer.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "LaterRun",
+ChromeUtils.defineModuleGetter(this, "LaterRun",
   "resource:///modules/LaterRun.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
+ChromeUtils.defineModuleGetter(this, "SessionStore",
   "resource:///modules/sessionstore/SessionStore.jsm");
 
 const EXPORTED_SYMBOLS = ["Feature"];
