@@ -4,8 +4,6 @@
  * Feature module for the Search Nudges Shield Study.
  **/
 
-/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "(EXPORTED_SYMBOLS|Feature)" }]*/
-
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.importGlobalProperties(["fetch"]);
 
@@ -26,7 +24,6 @@ const PREF_NUDGES_SHOWN_COUNT = "extensions.shield-search-nudges.shown_count";
 const PREF_NUDGES_DISMISSED_CLICKAB = "extensions.shield-search-nudges.clicked-awesomebar";
 const PREF_NUDGES_DISMISSED_WITHOK = "extensions.shield-search-nudges.oked";
 const SEARCH_ENGINE_TOPIC = "browser-search-engine-modified";
-const SEARCH_SERVICE_TOPIC = "browser-search-service";
 const STRING_TIP_GENERAL = "urlbarSearchTip.onboarding";
 const STRING_TIP_REDIRECT = "urlbarSearchTip.engineIsCurrentPage";
 const TIP_PANEL_ID = "shield-search-nudges-panel";
@@ -75,28 +72,23 @@ function waitForCondition(condition, msg, interval = 100, maxTries = 50) {
   });
 }
 
-function getFocusedBrowserWindow() {
-  const window = Services.focus.activeWindow;
-  return window && window.document.documentURI == "chrome://browser/content/browser.xul" ?
-    window : Services.wm.getMostRecentWindow("navigator:browser");
-}
-
 class Feature {
   /**
    * The feature this study implements.
    *
    *  - studyUtils: the configured studyUtils singleton.
-   *  - reasonName: string of bootstrap.js startup/shutdown reason
    *
    */
-  constructor(variation, studyUtils, reasonName, log, libPath) {
+  constructor(variation, studyUtils, log, libPath) {
     this.variation = variation;
     this.studyUtils = studyUtils;
-    this.reasonName = reasonName;
     this.log = log;
     this.libPath = libPath;
-    this.frameScript = `${this.libPath}/shield-search-nudges-content.js?` + Math.random();
     this.shownPanelType = null;
+    this._tabsProgressListener = new Map();
+    this._listenersAdded = false;
+    this._searchEngineObserverAdded = false;
+    this._searchEngineCurrentOrigin = "";
   }
 
   /**
@@ -120,17 +112,75 @@ class Feature {
    * 2. loading the frame script and
    * 3. connect with the Search service.
    */
-  async start() {
+  async start(reason) {
     this.log.debug("Feature start");
 
     // Perform something only during INSTALL = a new study period begins.
-    if (this.reasonName === "ADDON_INSTALL") {
+    if (reason === "ADDON_INSTALL") {
       this.resetPrefs();
+      // Return early, don't set up anything else.
+      // We do this for the first session after installation to avoid:
+      // - The first session after a new installation (aka new user).
+      // - The first session after upgrade (which is difficult to detect without
+      //   changes to core Firefox).
+      return;
     }
 
+    // We wait for this promise, and then idle dispatch, so that hopefully
+    // nsBrowserGlue has had time to do it stuff, and then work out if it is
+    // displaying the default browser prompt.
     await SessionStore.promiseAllWindowsRestored;
-    await this.loadFrameScript();
-    await this.connectWithSearch();
+
+    Services.tm.idleDispatchToMainThread(() => {
+      // Listen for new windows being opened
+      Services.ww.registerNotification(this);
+
+      const winEnum = Services.wm.getEnumerator("navigator:browser");
+      while (winEnum.hasMoreElements()) {
+        const win = winEnum.getNext();
+        if (win.closed) {
+          continue;
+        }
+        this._addListenersForWindow(win);
+      }
+      this._listenersAdded = true;
+
+      this._checkDisplayOnFirstStartup();
+    });
+  }
+
+  _addListenersForWindow(window) {
+    window.gBrowser.addTabsProgressListener(this);
+    window.gBrowser.tabContainer.addEventListener("TabSelect", this);
+  }
+
+  _removeListenersFromWindow(window) {
+    window.gBrowser.removeTabsProgressListener(this);
+    window.gBrowser.tabContainer.removeEventListener("TabSelect", this);
+  }
+
+  /**
+   * Returns the current search engine origin.
+   *
+   * @return {String} Returns a string which is the origin, or an empty string
+   *                  if the search service isn't initialized.
+   */
+  get currentEngineOrigin() {
+    if (!Services.search.isInitialized) {
+      return "";
+    }
+
+    if (this._searchEngineCurrentOrigin) {
+      return this._searchEngineCurrentOrigin;
+    }
+
+    if (!this._searchEngineObserverAdded) {
+      Services.obs.addObserver(this, SEARCH_ENGINE_TOPIC);
+      this._searchEngineObserverAdded = true;
+    }
+
+    this._searchEngineCurrentOrigin = Services.search.currentEngine.getSubmission("").uri.spec;
+    return this._searchEngineCurrentOrigin;
   }
 
   /**
@@ -152,42 +202,26 @@ class Feature {
   }
 
   /**
-   * Load a frame script that will be available to each browser window.
+   * Stops tracking for this session by removing all the listeners. This has
+   * the wanted side effect that we also stop displaying any popups.
    */
-  async loadFrameScript() {
-    const mm = await this.getMessageManager();
-    if (!mm) {
-      return;
+  stopTrackingForThisSession() {
+    if (this._searchEngineObserverAdded) {
+      Services.obs.removeObserver(this, SEARCH_ENGINE_TOPIC);
+      this._searchEngineObserverAdded = false;
     }
-    mm.loadFrameScript(this.frameScript, true);
-    mm.addMessageListener("ShieldSearchNudges:OnEnginePage", this);
-    mm.addMessageListener("ShieldSearchNudges:OnHomePage", this);
-  }
 
-  /**
-   * Await a possible asynchronous initialization of the Search service and start
-   * listening for changes to engine-current.
-   * When all that is done, notify the content script of the currently selected
-   * search engine.
-   */
-  async connectWithSearch() {
-    await new Promise(resolve => {
-      if (Services.search.isInitialized) {
-        resolve();
-        return;
-      }
-      Services.obs.addObserver(function observer(subject, topic, data) {
-        if (data != "init-complete") {
-          return;
+    if (this._listenersAdded) {
+      Services.ww.unregisterNotification(this);
+      const winEnum = Services.wm.getEnumerator("navigator:browser");
+      while (winEnum.hasMoreElements()) {
+        const win = winEnum.getNext();
+        if (win.closed) {
+          continue;
         }
-        Services.obs.removeObserver(observer, SEARCH_SERVICE_TOPIC);
-        resolve();
-      }, SEARCH_SERVICE_TOPIC);
-    });
-
-    Services.obs.addObserver(this, SEARCH_ENGINE_TOPIC);
-
-    await this.sendCurrentEngineToContent();
+        this._removeListenersFromWindow(win);
+      }
+    }
   }
 
   /**
@@ -201,49 +235,55 @@ class Feature {
       this.resetPrefs(true);
     }
 
-    const window = await getBrowserWindow();
-    if (!window) {
-      return;
-    }
-
-    const mm = window.getGroupMessageManager("browsers");
-    mm.removeMessageListener("ShieldSearchNudges:OnEnginePage", this);
-    mm.removeMessageListener("ShieldSearchNudges:OnHomePage", this);
-    // Unload the frame script.
-    mm.loadFrameScript("data,:!!ShieldSearchNudges && ShieldSearchNudges.deinit();" +
-      "ShieldSearchNudges = null; Components.utils.forceGC();", true);
-    mm.removeDelayedFrameScript(this.frameScript);
-    try {
-      Services.obs.removeObserver(this, SEARCH_ENGINE_TOPIC);
-    } catch (ex) {}
+    this.stopTrackingForThisSession();
 
     // If the panel was created in this window before, let's make sure to clean it up.
-    if (window.document && window.document.getElementById(TIP_PANEL_ID)) {
-      const {panel, panelButton} = this._ensurePanel(window);
-      panelButton.removeEventListener("command", this);
-      panel.remove();
+    const winEnum = Services.wm.getEnumerator("navigator:browser");
+    while (winEnum.hasMoreElements()) {
+      const win = winEnum.getNext();
+      if (win.document && win.document.getElementById(TIP_PANEL_ID)) {
+        const {panel, panelButton} = this._ensurePanel(win);
+        panelButton.removeEventListener("command", this);
+        panel.remove();
+      }
     }
   }
 
-  receiveMessage(message) {
-    switch (message.name) {
-      case "ShieldSearchNudges:OnEnginePage":
-        this.maybeShowTip("redirect");
+  observe(subject, topic /* , data */) {
+    switch (topic) {
+      case "domwindowopened": {
+        if (!(subject instanceof Ci.nsIDOMWindow) || subject.closed) {
+          break;
+        }
+        const onLoad = () => {
+          // Ignore non-browser windows.
+          if (subject.document.documentElement.getAttribute("windowtype") === "navigator:browser") {
+            this._addListenersForWindow(subject);
+          }
+        };
+        subject.addEventListener("load", onLoad, {once: true});
         break;
-      case "ShieldSearchNudges:OnHomePage":
-        this.maybeShowTip("general");
-        break;
-      default:
-        Cu.reportError("ShieldSearchNudges: unknown message name.");
+      }
+      case "domwindowclosed":
+        if ((subject instanceof Ci.nsIDOMWindow) &&
+           subject.document.documentElement.getAttribute("windowtype") === "navigator:browser") {
+          this._removeListenersFromWindow(subject);
+        }
         break;
     }
   }
 
-  observe(engine, topic, verb) {
-    if (topic != SEARCH_ENGINE_TOPIC || verb != "engine-current") {
-      return;
+  onLocationChange(browser, webProgress, request, locationURI, /* aFlags */) {
+    // Note: a null request probably means this was just a simple session restore.
+    if (locationURI && locationURI.spec && request && webProgress.isTopLevel) {
+      const topWindow = Services.wm.getMostRecentWindow("navigator:browser");
+      if (topWindow && topWindow.gBrowser) {
+        const tab = topWindow.gBrowser.getTabForBrowser(browser);
+        if (tab && tab.selected) {
+          this._checkDocument(locationURI.spec);
+        }
+      }
     }
-    this.sendCurrentEngineToContent();
   }
 
   handleEvent(event) {
@@ -276,28 +316,64 @@ class Feature {
         this.shownPanelType = null;
         break;
       }
+      case "TabSelect": {
+        if (event.target.linkedBrowser &&
+            event.target.linkedBrowser.currentURI) {
+          this._checkDocument(event.target.linkedBrowser.currentURI.spec);
+        }
+        break;
+      }
       default:
-        Cu.reportError("ShieldSearchNudges: Unknown event.");
+        Cu.reportError(`ShieldSearchNudges: Unknown event: ${event.type}`);
         break;
     }
   }
 
   /**
-   * Sends the origin part of the current search engine's URL to the frame script,
-   * so it can compare it to loaded pages' URLs.
+   * On startup, we need to check that the default engine isn't being displayed,
+   * and if it isn't then we display the doorhanger if one of the pages we
+   * are looking for is displayed.
    */
-  async sendCurrentEngineToContent() {
-    const mm = await this.getMessageManager();
-    if (!mm) {
+  _checkDisplayOnFirstStartup() {
+    const winEnum = Services.ww.getWindowEnumerator();
+    while (winEnum.hasMoreElements()) {
+      const win = winEnum.getNext();
+      if (win.document.documentURI == "chrome://global/content/commonDialog.xul" ||
+          win.document.documentURI == "chrome://global/content/selectDialog.xul") {
+        // There is some sort of modal dialog displaying, probably the default
+        // browser one, so just get outta here.
+        return;
+      }
+    }
+
+    const topWindow = Services.wm.getMostRecentWindow("navigator:browser");
+    if (topWindow && topWindow.gBrowser && topWindow.gBrowser.selectedBrowser &&
+        topWindow.gBrowser.selectedBrowser.spec) {
+      this._checkDocument(topWindow.gBrowser.selectedBrowser.spec);
+    }
+  }
+
+  /**
+   * Checks to see if the document matches about:home, about:newtab or the
+   * current search engine page.
+   *
+   * @param {String} documentURI The document URI to check.
+   */
+  _checkDocument(documentURI) {
+    const currentEngineOrigin = this.currentEngineOrigin;
+    if (!currentEngineOrigin) {
       return;
     }
 
-    const engine = Services.search.currentEngine.wrappedJSObject;
-    let origin = "";
-    if (engine._isDefault) {
-      origin = new URL(engine.getSubmission("").uri.spec).origin;
+    // right-trim any superfluous trailing URL part that may be entered by accident,
+    // but will still load as the search engine homepage.
+    // Examples: https://www.google.com//, https://www.bing.com/?#
+    const url = documentURI && documentURI.replace(/[\\/?#]+$/, "");
+    if (url == "about:home" || url == "about:newtab") {
+      this._maybeShowTip("general");
+    } else if (currentEngineOrigin.startsWith(url)) {
+      this._maybeShowTip("redirect");
     }
-    mm.broadcastAsyncMessage("ShieldSearchNudges:UpdateEngineOrigin", {origin});
   }
 
   /**
@@ -336,7 +412,7 @@ class Feature {
    *
    * @param {String} type The tip to display; may be 'general' or 'redirect'
    */
-  async maybeShowTip(type) {
+  async _maybeShowTip(type) {
     if (this.hasExpired()) {
       this.telemetry({event: type + "-notshown-expired"});
       this.studyUtils.endStudy({reason: "expired"});
@@ -349,6 +425,7 @@ class Feature {
     const window = await getBrowserWindow();
     if (!window) {
       this.telemetry({event: type + "-notshown-nobrowserwindow"});
+      return;
     }
 
     const anchor = window.document.querySelector(TIP_ANCHOR_SELECTOR);
@@ -357,7 +434,7 @@ class Feature {
       return;
     }
 
-    if (LaterRun.enabled && LaterRun.sessionCount == 1 && LaterRun.hoursSinceInstall <= 1) {
+    if (LaterRun.enabled && LaterRun.sessionCount == 1) {
       // Do not show the tip when this is the very first session in a newly
       // created profile.
       this.telemetry({event: type + "-notshown-freshprofile"});
@@ -392,6 +469,9 @@ class Feature {
       Services.prefs.getIntPref(PREF_NUDGES_SHOWN_COUNT, 0) + 1);
 
     this.telemetry({event: type + "-shown"});
+
+    // We've shown it once, that's enough for this session.
+    this.stopTrackingForThisSession();
   }
 
   /**
