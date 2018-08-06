@@ -45,7 +45,7 @@ describe("basic functional tests", function() {
   let pings;
 
   // runs ONCE
-  before(async() => {
+  before(async () => {
     const beginTime = Date.now();
     driver = await utils.promiseSetupDriver();
     // await setTreatment(driver, "doorHangerAddToToolbar");
@@ -61,12 +61,12 @@ describe("basic functional tests", function() {
     // console.log(pingsReport(pings).report);
   });
 
-  after(async() => {
+  after(async () => {
     driver.quit();
   });
 
-  beforeEach(async() => {});
-  afterEach(async() => {});
+  beforeEach(async () => {});
+  afterEach(async () => {});
 
   /* Expected behaviour:
 
@@ -78,11 +78,11 @@ describe("basic functional tests", function() {
 
   // TODO glind, this is an incomplete set of tests
 
-  it("should send shield telemetry pings", async() => {
+  it("should send shield telemetry pings", async () => {
     assert(pings.length > 0, "at least one shield telemetry ping");
   });
 
-  it("at least one shield-study telemetry ping with study_state=installed", async() => {
+  it("at least one shield-study telemetry ping with study_state=installed", async () => {
     const foundPings = utils.searchTelemetry(
       [
         ping =>
@@ -97,7 +97,7 @@ describe("basic functional tests", function() {
     );
   });
 
-  it("at least one shield-study telemetry ping with study_state=enter", async() => {
+  it("at least one shield-study telemetry ping with study_state=enter", async () => {
     const foundPings = utils.searchTelemetry(
       [
         ping =>
@@ -141,7 +141,7 @@ describe("basic functional tests", function() {
   });
 
   describe("introduction / orientation bar", function() {
-    it("exists, carries study config", async() => {
+    it("exists, carries study config", async () => {
       const notice = await getNotification(driver);
       const noticeConfig = JSON.parse(
         await notice.getAttribute("data-study-config"),
@@ -150,13 +150,13 @@ describe("basic functional tests", function() {
       assert(noticeConfig.weight);
     });
 
-    it("okay button looks fine.", async() => {
+    it("okay button looks fine.", async () => {
       const firstButton = await getFirstButton(driver);
       const label = await firstButton.getAttribute("label");
       assert.equal(label, "Thanks!");
     });
 
-    it("clicking okay gives telemetry", async() => {
+    it("clicking okay gives telemetry", async () => {
       const startTime = Date.now();
       const firstButton = await getFirstButton(driver);
       await firstButton.click();
@@ -179,19 +179,19 @@ describe("basic functional tests", function() {
       assert.deepEqual(expected, observed, "telemetry pings do not match");
     });
 
-    it("TBD click on NO uninstalls addon", async() => {
+    it("TBD click on NO uninstalls addon", async () => {
       assert(true);
     });
   });
 
   describe("ui button (browserAction)", function() {
-    it("TBD exists", async() => {
+    it("TBD exists", async () => {
       assert(true);
     });
-    it("TBD responds to clicks", async() => {
+    it("TBD responds to clicks", async () => {
       assert(true);
     });
-    it("TBD sends correct telemetry", async() => {
+    it("TBD sends correct telemetry", async () => {
       assert(true);
     });
   });

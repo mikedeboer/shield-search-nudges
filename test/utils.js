@@ -66,7 +66,7 @@ async function promiseActualBinary(binary) {
  * Uses process.env.FIREFOX_BINARY
  *
  */
-module.exports.promiseSetupDriver = async() => {
+module.exports.promiseSetupDriver = async () => {
   const profile = new firefox.Profile();
 
   // TODO, allow 'actually send telemetry' here.
@@ -111,18 +111,18 @@ module.exports.MODIFIER_KEY = MODIFIER_KEY;
 /* Firefox UI helper functions */
 
 // such as:  "social-share-button"
-module.exports.addButtonFromCustomizePanel = async(driver, buttonId) =>
+module.exports.addButtonFromCustomizePanel = async (driver, buttonId) =>
   driver.executeAsyncScript(callback => {
     // see https://dxr.mozilla.org/mozilla-central/rev/211d4dd61025c0a40caea7a54c9066e051bdde8c/browser/base/content/browser-social.js#193
-    Components.utils.import("resource:///modules/CustomizableUI.jsm");
+    ChromeUtils.import("resource:///modules/CustomizableUI.jsm");
     CustomizableUI.addWidgetToArea(buttonId, CustomizableUI.AREA_NAVBAR);
     callback();
   });
 
-module.exports.removeButtonFromNavbar = async(driver, buttonId) => {
+module.exports.removeButtonFromNavbar = async (driver, buttonId) => {
   try {
     await driver.executeAsyncScript(callback => {
-      Components.utils.import("resource:///modules/CustomizableUI.jsm");
+      ChromeUtils.import("resource:///modules/CustomizableUI.jsm");
       CustomizableUI.removeWidgetFromArea(buttonId);
       callback();
     });
@@ -138,7 +138,7 @@ module.exports.removeButtonFromNavbar = async(driver, buttonId) => {
   }
 };
 
-module.exports.installAddon = async(driver, fileLocation) => {
+module.exports.installAddon = async (driver, fileLocation) => {
   // references:
   //    https://bugzilla.mozilla.org/show_bug.cgi?id=1298025
   //    https://github.com/mozilla/geckodriver/releases/tag/v0.17.0
@@ -161,7 +161,7 @@ module.exports.installAddon = async(driver, fileLocation) => {
   return executor.execute(installCmd);
 };
 
-module.exports.uninstallAddon = async(driver, id) => {
+module.exports.uninstallAddon = async (driver, id) => {
   const executor = driver.getExecutor();
   executor.defineCommand(
     "uninstallAddon",
@@ -197,12 +197,12 @@ module.exports.allAddons = async(driver) => {
  * - timestamp:  only pings after this timestamp.
  * - headersOnly: boolean, just the 'headers' for the pings, not the full bodies.
  */
-module.exports.getTelemetryPings = async(driver, passedOptions) => {
+module.exports.getTelemetryPings = async (driver, passedOptions) => {
   // callback is how you get the return back from the script
-  return driver.executeAsyncScript(async(options, callback) => {
+  return driver.executeAsyncScript(async (options, callback) => {
     let { type } = options;
     const { n, timestamp, headersOnly } = options;
-    Components.utils.import("resource://gre/modules/TelemetryArchive.jsm");
+    ChromeUtils.import("resource://gre/modules/TelemetryArchive.jsm");
     // {type, id, timestampCreated}
     let pings = await TelemetryArchive.promiseArchivedPingList();
     if (type) {
@@ -260,7 +260,7 @@ module.exports.promiseUrlBar = driver => {
   return driver.wait(until.elementLocated(By.id("urlbar")), 1000);
 };
 
-module.exports.takeScreenshot = async(
+module.exports.takeScreenshot = async (
   driver,
   filepath = "./screenshot.png",
 ) => {
@@ -272,7 +272,7 @@ module.exports.takeScreenshot = async(
   }
 };
 
-module.exports.gotoURL = async(driver, url) => {
+module.exports.gotoURL = async (driver, url) => {
   // navigate to a regular page
   driver.setContext(Context.CONTENT);
   await driver.get(url);
