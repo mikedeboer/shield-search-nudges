@@ -14,7 +14,7 @@
 * Set `extensions.shield-search-nudges.variation` to one of:
   * `doshow` - The panel is shown to the user.
   * `noshow` - The panel is not shown to the user, however some telemetry is still logged (the telemetry for hiding the panel cannot be logged as it isn't shown).
-* Go to [this study's tracking bug](tbd: replace with your study's launch bug link in bugzilla) and install the latest signed XPI
+* Go to [this study's tracking bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1462136) and install the latest signed XPI
 
 ## Expected User Experience / Functionality
 
