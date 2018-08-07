@@ -15,6 +15,8 @@ ChromeUtils.defineModuleGetter(this, "LaterRun",
   "resource:///modules/LaterRun.jsm");
 ChromeUtils.defineModuleGetter(this, "SessionStore",
   "resource:///modules/sessionstore/SessionStore.jsm");
+ChromeUtils.defineModuleGetter(this, "BrowserWindowTracker",
+  "resource:///modules/BrowserWindowTracker.jsm");
 
 const EXPORTED_SYMBOLS = ["Feature"];
 const NUDGES_SHOWN_COUNT_MAX = 4;
@@ -32,12 +34,12 @@ const TIP_ANCHOR_SELECTOR = "#identity-icon";
  * yet, simply wait for the first browser window to open.
  */
 async function getBrowserWindow() {
-  const window = Services.wm.getMostRecentWindow("navigator:browser");
+  const window = BrowserWindowTracker.getTopWindow();
   if (window) {
     return window;
   }
 
-  return waitForCondition(() => Services.wm.getMostRecentWindow("navigator:browser"));
+  return waitForCondition(() => BrowserWindowTracker.getTopWindow());
 }
 
 function waitForCondition(condition, msg, interval = 100, maxTries = 50) {
@@ -83,26 +85,10 @@ class Feature {
     this.log = log;
     this.libPath = libPath;
     this.shownPanelType = null;
-    this._tabsProgressListener = new Map();
     this._listenersAdded = false;
     this._searchEngineObserverAdded = false;
     this._searchEngineCurrentOrigin = "";
     this._startingUp = true;
-  }
-
-  /**
-   * Retrieve the frontmost browser window. It will wait a while if there are none
-   * available yet.
-   *
-   * @return {DOMWindow}
-   */
-  async getMessageManager() {
-    const window = await getBrowserWindow();
-    if (!window) {
-      return null;
-    }
-
-    return window.getGroupMessageManager("browsers");
   }
 
   /**
@@ -246,7 +232,7 @@ class Feature {
     const winEnum = Services.wm.getEnumerator("navigator:browser");
     while (winEnum.hasMoreElements()) {
       const win = winEnum.getNext();
-      if (win.document && win.document.getElementById(TIP_PANEL_ID)) {
+      if (win.document && win.document.getElementById(TIP_PANEL_ID) && !win.closed) {
         const {panel, panelButton} = this._ensurePanel(win);
         panelButton.removeEventListener("command", this);
         panel.remove();
@@ -281,12 +267,9 @@ class Feature {
   onLocationChange(browser, webProgress, request, locationURI, /* aFlags */) {
     // Note: a null request probably means this was just a simple session restore.
     if (locationURI && locationURI.spec && request && webProgress.isTopLevel) {
-      const topWindow = Services.wm.getMostRecentWindow("navigator:browser");
-      if (topWindow && topWindow.gBrowser) {
-        const tab = topWindow.gBrowser.getTabForBrowser(browser);
-        if (tab && tab.selected) {
-          this._checkDocument(locationURI.spec);
-        }
+      const tab = browser.ownerGlobal.gBrowser.getTabForBrowser(browser);
+      if (tab && tab.selected) {
+        this._checkDocument(locationURI.spec);
       }
     }
   }
@@ -343,10 +326,9 @@ class Feature {
     const winEnum = Services.ww.getWindowEnumerator();
     while (winEnum.hasMoreElements()) {
       const win = winEnum.getNext();
-      if (win.document.documentURI == "chrome://global/content/commonDialog.xul" ||
-          win.document.documentURI == "chrome://global/content/selectDialog.xul") {
-        // There is some sort of modal dialog displaying, probably the default
-        // browser one, so just get outta here.
+      if (win.document.documentURI != "chrome://browser/content/browser.xul") {
+        // There is some sort of modal dialog displaying (or something else),
+        // but probably the default browser one, so just get outta here.
         return;
       }
     }
