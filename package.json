@@ -6,14 +6,14 @@
   "addon": {
     "$ABOUT": "use these variables fill the moustache templates",
     "id": "search-nudges@shield.mozilla.org",
-    "name": "Showing a search doorhanger when the urlbar is focused study.",
+    "name": "User search study",
     "minVersion": "57.0",
     "maxVersion": "*",
     "multiprocessCompatible": true,
     "hasEmbeddedWebExtension": false,
     "chromeResource": "search-nudges",
     "creator": "Mike de Boer <mdeboer@mozilla.com>",
-    "description": "Study to measure if showing a doorhanger to introduce search using the urlbar is helpful",
+    "description": "This is a study to understand how users interact with search engines in Firefox.",
     "bugzilla": "https://bugzilla.mozilla.org/show_bug.cgi?id=1462136",
     "iconPath": "icon.png"
   },
