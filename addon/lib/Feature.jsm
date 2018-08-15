@@ -266,7 +266,7 @@ class Feature {
     }
   }
 
-  observe(subject, topic /* , data */) {
+  observe(subject, topic, verb) {
     switch (topic) {
       case "domwindowopened": {
         if (!(subject instanceof Ci.nsIDOMWindow) || subject.closed) {
@@ -286,6 +286,13 @@ class Feature {
            subject.document.documentElement.getAttribute("windowtype") === "navigator:browser") {
           this._removeListenersFromWindow(subject);
         }
+        break;
+      case SEARCH_ENGINE_TOPIC:
+        if (verb != "engine-current") {
+          break;
+        }
+        // The current engine changed, reset the cache!
+        this._searchEngineCurrentOrigin = "";
         break;
     }
   }
