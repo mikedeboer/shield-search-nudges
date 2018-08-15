@@ -87,6 +87,7 @@ class Feature {
     this.log = log;
     this.libPath = libPath;
     this.shownPanelType = null;
+    this._shownPanels = new Set();
     this._listenersAdded = false;
     this._searchEngineObserverAdded = false;
     this._searchEngineCurrentOrigin = "";
@@ -292,9 +293,10 @@ class Feature {
   onLocationChange(browser, webProgress, request, locationURI, /* aFlags */) {
     // Note: a null request probably means this was just a simple session restore.
     if (locationURI && locationURI.spec && request && webProgress.isTopLevel) {
-      const tab = browser.ownerGlobal.gBrowser.getTabForBrowser(browser);
+      const window = browser.ownerGlobal;
+      const tab = window.gBrowser.getTabForBrowser(browser);
       if (tab && tab.selected) {
-        this._checkDocument(locationURI.spec);
+        this._checkDocument(locationURI.spec, window);
       }
     }
   }
@@ -326,13 +328,18 @@ class Feature {
         } else {
           this.telemetry({event: eventPrefix + "hidden"});
         }
+        this._shownPanels.add(this.shownPanelType);
         this.shownPanelType = null;
+        // Once we've shown both panel types once, that's enough for this session.
+        if (this._shownPanels.size == 2) {
+          this.stopTrackingForThisSession();
+        }
         break;
       }
       case "TabSelect": {
         if (event.target.linkedBrowser &&
             event.target.linkedBrowser.currentURI) {
-          this._checkDocument(event.target.linkedBrowser.currentURI.spec);
+          this._checkDocument(event.target.linkedBrowser.currentURI.spec, event.target.parentNode.ownerGlobal);
         }
         break;
       }
@@ -368,18 +375,24 @@ class Feature {
    * Checks to see if the document matches about:home, about:newtab or the
    * current search engine page.
    *
-   * @param {String} documentURI The document URI to check.
+   * @param {String}    documentURI The document URI to check.
+   * @param {DOMWindow} window      The current window object.
    */
-  _checkDocument(documentURI) {
+  _checkDocument(documentURI, window) {
+    this._hideTip(window);
     const currentEngineOrigin = this.currentEngineOrigin;
     if (!currentEngineOrigin) {
       return;
     }
 
-    // right-trim any superfluous trailing URL part that may be entered by accident,
-    // but will still load as the search engine homepage.
+    // Right-trim any query params that may be added to the URL after redirects
+    // by the engine homepage.
+    // Examples: https://www.google.com/?gws_rd=ssl,
+    //           https://www.bing.com/?toWww=1&redig=32177FB59AE945FF944024F304AAE1E6
+    // Additionally, right-trim any superfluous trailing URL part that may be
+    // entered by accident, but will still load as the search engine homepage.
     // Examples: https://www.google.com//, https://www.bing.com/?#
-    const url = documentURI && documentURI.replace(/[\\/?#]+$/, "");
+    const url = documentURI && documentURI.replace(/(.*)[\\/?#]+.*$/, "$1").replace(/[/?#]+$/, "");
     if (url == "about:home" || url == "about:newtab") {
       this._maybeShowTip("general");
     } else if (currentEngineOrigin == url) {
@@ -461,7 +474,7 @@ class Feature {
     const [button, content] = await this._getStrings(window, type, engine);
 
     const {panel, panelImage, panelDescription, panelButton} = this._ensurePanel(window);
-    if (panel.state == "showing" || panel.state == "open") {
+    if (["open", "showing"].includes(panel.state) || this._shownPanels.has(type)) {
       this.telemetry({event: type + "-notshown-alreadyshown"});
       return;
     }
@@ -485,9 +498,13 @@ class Feature {
       Services.prefs.getIntPref(PREF_NUDGES_SHOWN_COUNT, 0) + 1);
 
     this.telemetry({event: type + "-shown"});
+  }
 
-    // We've shown it once, that's enough for this session.
-    this.stopTrackingForThisSession();
+  _hideTip(window) {
+    const panel = window.document.getElementById(TIP_PANEL_ID);
+    if (panel && ["open", "showing"].includes(panel.state)) {
+      panel.hidePopup();
+    }
   }
 
   /**
