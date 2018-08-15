@@ -7,6 +7,8 @@
 Cu.importGlobalProperties(["fetch"]);
 
 ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.defineModuleGetter(this, "AddonManager",
+  "resource://gre/modules/AddonManager.jsm");
 ChromeUtils.defineModuleGetter(this, "clearInterval",
   "resource://gre/modules/Timer.jsm");
 ChromeUtils.defineModuleGetter(this, "setInterval",
@@ -119,6 +121,9 @@ class Feature {
     // Listen for new windows being opened
     Services.ww.registerNotification(this);
 
+    // Listen for addon disabling or uninstall.
+    AddonManager.addAddonListener(this);
+
     this._startingUp = true;
 
     const winEnum = Services.wm.getEnumerator("navigator:browser");
@@ -149,6 +154,26 @@ class Feature {
     window.gBrowser.removeTabsProgressListener(this);
     window.gBrowser.tabContainer.removeEventListener("TabSelect", this);
   }
+
+  /* START AddonListener interface methods. */
+  onUninstalling(addon) {
+    this.handleDisableOrUninstall(addon);
+  }
+
+  onDisabled(addon) {
+    this.handleDisableOrUninstall(addon);
+  }
+
+  handleDisableOrUninstall(addon) {
+    if (addon.id !== this.studyUtils.info().addon.id) {
+      return;
+    }
+    AddonManager.removeAddonListener(this);
+    // This is needed even for onUninstalling, because it nukes the addon
+    // from UI. If we don't do this, the user has a chance to "undo".
+    addon.uninstall();
+  }
+  /* END AddonListener interface methods. */
 
   /**
    * Returns the current search engine origin.
