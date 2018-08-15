@@ -410,10 +410,20 @@ class Feature {
    *
    * @return {Boolean}
    */
-  hasExpired() {
+  _checkPreConditions() {
     return Services.prefs.getBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, false) ||
       Services.prefs.getBoolPref(PREF_NUDGES_DISMISSED_WITHOK, false) ||
       Services.prefs.getIntPref(PREF_NUDGES_SHOWN_COUNT, 0) >= NUDGES_SHOWN_COUNT_MAX;
+  }
+
+  /**
+   * This study should expire through Normandy, but should also stop working once
+   * the pre-conditions have been met earlier.
+   *
+   * @return {Boolean}
+   */
+  hasExpired() {
+    return this._checkPreConditions();
   }
 
   /**
@@ -428,7 +438,7 @@ class Feature {
   /**
    * Show the panel with a specific onboarding tip, except when the following
    * conditions are encountered:
-   *  - Study has expired,
+   *  - One of the pre-conditions couldn't be met,
    *  - No browser window could be found,
    *  - The panel anchor element could not be found,
    *  - A fresh profile was detected, which means that the user just installed the browser,
@@ -442,9 +452,8 @@ class Feature {
       return;
     }
 
-    if (this.hasExpired()) {
-      this.telemetry({event: type + "-notshown-expired"});
-      this.studyUtils.endStudy({reason: "expired"});
+    if (this._checkPreConditions()) {
+      this.telemetry({event: type + "-notshown-preconditions"});
       return;
     }
 

@@ -48,8 +48,11 @@ All events for when a prompt is attempted to be shown are:
 
 * `<target>-shown`
   * The prompt has been shown
-* `<target>-notshown-expired`
-  * The prompt was not shown as we have now expired
+* `<target>-notshown-preconditions`
+  * The prompt was not shown as one of the preconditions couldn't be met:
+    * The AwesomeBar was clicked whilst one of the tips was shown,
+    * One of the tips was dismissed by clicking the 'Okay, got it' button,
+    * The tips were shown more than four times in sum.
 * `<target>-notshown-nobrowserwindow`
   * The prompt was not shown as we have no browser window (shouldn't really happen)
 * `<target>-notshown-missinganchor`
@@ -57,7 +60,7 @@ All events for when a prompt is attempted to be shown are:
 * `<target>-notshown-freshprofile`
   * The prompt was not shown because this is a fresh profile.
 * `<target>-notshown-alreadyshown`
-  * The prompt is already showing.
+  * The prompt is already showing, or the type of tip was already shown before this session.
 
 All events for when a prompt is shown, and the user does an action are:
 
