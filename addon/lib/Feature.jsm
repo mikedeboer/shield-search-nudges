@@ -568,7 +568,8 @@ class Feature {
     const panelDescription = panelBody.appendChild(document.createElement("vbox"))
       .appendChild(document.createElement("description"));
     const panelButton = panelBody.parentNode.appendChild(document.createElement("button"));
-    panelButton.setAttribute("style", "margin: 1em -16px -16px; color: inherit");
+    panelButton.setAttribute("style",
+      "margin: 1em calc(-1*var(--arrowpanel-padding)) calc(-1*var(--arrowpanel-padding)); color: inherit");
     panelButton.className = "subviewbutton panel-subview-footer";
     for (const flexElement of [panelDescription, panelDescription.parentNode, panelButton.parentNode]) {
       flexElement.setAttribute("flex", "1");
