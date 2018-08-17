@@ -76,7 +76,7 @@ this.Bootstrap = {
     // Expiration checks should be implemented in a very reliable way by the
     // add-on since Normandy does not handle study expiration in a reliable manner
     if (this.feature.hasExpired()) {
-      await studyUtils.endStudy({ reason: "expired" });
+      await this.feature.handleExpiry();
       return;
     }
 

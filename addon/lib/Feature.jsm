@@ -25,6 +25,8 @@ const NUDGES_SHOWN_COUNT_MAX = 4;
 const PREF_NUDGES_SHOWN_COUNT = "extensions.shield-search-nudges.shown_count";
 const PREF_NUDGES_DISMISSED_CLICKAB = "extensions.shield-search-nudges.clicked-awesomebar";
 const PREF_NUDGES_DISMISSED_WITHOK = "extensions.shield-search-nudges.oked";
+const PREF_NUDGES_INSTALL_TIME = "extensions.shield-search-nudges.installed_at";
+const EXPIRY_TIMESPAN_MS = 3628800000; // 6 weeks.
 const SEARCH_ENGINE_TOPIC = "browser-search-engine-modified";
 const STRING_TIP_GENERAL = "urlbarSearchTip.onboarding";
 const STRING_TIP_REDIRECT = "urlbarSearchTip.engineIsCurrentPage";
@@ -165,6 +167,7 @@ class Feature {
   onDisabled(addon) {
     this.handleDisableOrUninstall(addon);
   }
+  /* END AddonListener interface methods. */
 
   handleDisableOrUninstall(addon) {
     if (addon.id !== this.studyUtils.config.addon.id) {
@@ -178,7 +181,18 @@ class Feature {
     // from UI. If we don't do this, the user has a chance to "undo".
     addon.uninstall();
   }
-  /* END AddonListener interface methods. */
+
+  /**
+   * When an experiment expires (also happens when all preconditions have been
+   * met), uninstall the addon forcibly.
+   */
+  async handleExpiry() {
+    await this.studyUtils.endStudy({ reason: "expired" });
+    const addon = await AddonManager.getAddonByID(this.studyUtils.config.addon.id);
+    if (addon) {
+      this.handleDisableOrUninstall(addon);
+    }
+  }
 
   /**
    * Returns the current search engine origin.
@@ -212,11 +226,13 @@ class Feature {
    */
   resetPrefs(permanently = false) {
     if (permanently) {
-      for (const pref of [PREF_NUDGES_SHOWN_COUNT, PREF_NUDGES_DISMISSED_CLICKAB, PREF_NUDGES_DISMISSED_WITHOK]) {
+      for (const pref of [PREF_NUDGES_SHOWN_COUNT, PREF_NUDGES_INSTALL_TIME,
+        PREF_NUDGES_DISMISSED_CLICKAB, PREF_NUDGES_DISMISSED_WITHOK]) {
         Services.prefs.clearUserPref(pref);
       }
     } else {
       Services.prefs.setIntPref(PREF_NUDGES_SHOWN_COUNT, 0);
+      Services.prefs.setIntPref(PREF_NUDGES_INSTALL_TIME, Date.now() / 1000);
       Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, false);
       Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_WITHOK, false);
     }
@@ -257,6 +273,7 @@ class Feature {
     }
 
     this.stopTrackingForThisSession();
+    AddonManager.removeAddonListener(this);
 
     // If the panel was created in this window before, let's make sure to clean it up.
     const winEnum = Services.wm.getEnumerator("navigator:browser");
@@ -439,6 +456,10 @@ class Feature {
       Services.prefs.getIntPref(PREF_NUDGES_SHOWN_COUNT, 0) >= NUDGES_SHOWN_COUNT_MAX;
   }
 
+  get expiryDate() {
+    return (Services.prefs.getIntPref(PREF_NUDGES_INSTALL_TIME, Date.now() / 1000) * 1000) + EXPIRY_TIMESPAN_MS;
+  }
+
   /**
    * This study should expire through Normandy, but should also stop working once
    * the pre-conditions have been met earlier.
@@ -446,7 +467,7 @@ class Feature {
    * @return {Boolean}
    */
   hasExpired() {
-    return this._checkPreConditions();
+    return this._checkPreConditions() || this.expiryDate < Date.now();
   }
 
   /**
@@ -475,8 +496,8 @@ class Feature {
       return;
     }
 
-    if (this._checkPreConditions()) {
-      this.telemetry({event: type + "-notshown-preconditions"});
+    if (this.hasExpired()) {
+      await this.handleExpiry();
       return;
     }
 
