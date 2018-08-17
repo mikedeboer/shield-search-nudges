@@ -344,6 +344,7 @@ class Feature {
           this.telemetry({event: eventPrefix + "hidden"});
         }
         window.gURLBar.inputField.removeEventListener("mousedown", this);
+        window.gURLBar.inputField.removeEventListener("keydown", this);
         this._URLBarWasClicked = false;
         this.shownPanelType = null;
         // Once we've shown both panel types once, that's enough for this session.
@@ -361,6 +362,9 @@ class Feature {
       }
       case "mousedown":
         this._URLBarWasClicked = true;
+        break;
+      case "keydown":
+        this._hideTip(event.target.ownerGlobal);
         break;
       default:
         Cu.reportError(`ShieldSearchNudges: Unknown event: ${event.type}`);
@@ -518,6 +522,7 @@ class Feature {
       panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
       panel.addEventListener("popuphidden", this, {once: true});
       window.gURLBar.inputField.addEventListener("mousedown", this);
+      window.gURLBar.inputField.addEventListener("keydown", this);
       this._URLBarWasClicked = false;
       this.shownPanelType = type;
       this._shownPanels.add(type);
