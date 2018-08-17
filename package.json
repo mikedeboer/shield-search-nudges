@@ -1,7 +1,7 @@
 {
   "name": "shield-studies-addon-template",
   "description": "Template Shield Study",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "author": "Mozilla Mike de Boer <mdeboer@mozilla.com>",
   "addon": {
     "$ABOUT": "use these variables fill the moustache templates",
