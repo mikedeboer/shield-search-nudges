@@ -166,10 +166,13 @@ class Feature {
   }
 
   handleDisableOrUninstall(addon) {
-    if (addon.id !== this.studyUtils.info().addon.id) {
+    if (addon.id !== this.studyUtils.config.addon.id) {
       return;
     }
-    AddonManager.removeAddonListener(this);
+    // The in-scope AddonManager may already be garbage-collected at this point,
+    // so we need to import it again to be sure.
+    ChromeUtils.import("resource://gre/modules/AddonManager.jsm", {})
+      .AddonManager.removeAddonListener(this);
     // This is needed even for onUninstalling, because it nukes the addon
     // from UI. If we don't do this, the user has a chance to "undo".
     addon.uninstall();
