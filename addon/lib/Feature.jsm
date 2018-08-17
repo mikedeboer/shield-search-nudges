@@ -338,7 +338,6 @@ class Feature {
         } else {
           this.telemetry({event: eventPrefix + "hidden"});
         }
-        this._shownPanels.add(this.shownPanelType);
         this.shownPanelType = null;
         // Once we've shown both panel types once, that's enough for this session.
         if (this._shownPanels.size == 2) {
@@ -509,6 +508,7 @@ class Feature {
       panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
       panel.addEventListener("popuphidden", this, {once: true});
       this.shownPanelType = type;
+      this._shownPanels.add(type);
     }
 
     // Increment the counter that keeps track of the number of times this popup
