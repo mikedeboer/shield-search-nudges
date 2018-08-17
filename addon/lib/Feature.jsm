@@ -92,6 +92,7 @@ class Feature {
     this._searchEngineObserverAdded = false;
     this._searchEngineCurrentOrigin = "";
     this._startingUp = true;
+    this._URLBarWasClicked = false;
   }
 
   /**
@@ -332,12 +333,18 @@ class Feature {
         // Check if the panel was hidden by clicking the URLBar.
         const window = event.target.ownerGlobal;
         const focusMethod = Services.focus.getLastFocusMethod(window);
-        if (window.gURLBar.focused && focusMethod && !!(focusMethod & Services.focus.FLAG_BYMOUSE)) {
+        const currentURI = window.gBrowser.currentURI && window.gBrowser.currentURI.spec;
+        const newTabWorkaround = this._URLBarWasClicked &&
+          (currentURI == "about:home" || currentURI == "about:newtab");
+        if (newTabWorkaround || (window.gURLBar.focused && focusMethod &&
+                                 !!(focusMethod & Services.focus.FLAG_BYMOUSE))) {
           Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, true);
           this.telemetry({event: eventPrefix + "hidden-awesomebarclick"});
         } else {
           this.telemetry({event: eventPrefix + "hidden"});
         }
+        window.gURLBar.inputField.removeEventListener("mousedown", this);
+        this._URLBarWasClicked = false;
         this.shownPanelType = null;
         // Once we've shown both panel types once, that's enough for this session.
         if (this._shownPanels.size == 2) {
@@ -352,6 +359,9 @@ class Feature {
         }
         break;
       }
+      case "mousedown":
+        this._URLBarWasClicked = true;
+        break;
       default:
         Cu.reportError(`ShieldSearchNudges: Unknown event: ${event.type}`);
         break;
@@ -507,6 +517,8 @@ class Feature {
 
       panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
       panel.addEventListener("popuphidden", this, {once: true});
+      window.gURLBar.inputField.addEventListener("mousedown", this);
+      this._URLBarWasClicked = false;
       this.shownPanelType = type;
       this._shownPanels.add(type);
     }
