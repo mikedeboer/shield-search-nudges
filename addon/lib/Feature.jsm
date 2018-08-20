@@ -411,7 +411,9 @@ class Feature {
         this._URLBarWasClicked = true;
         break;
       case "keydown":
-        this._hideTip(event.target.ownerGlobal);
+        if (event.key && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          this._hideTip(event.target.ownerGlobal);
+        }
         break;
       default:
         Cu.reportError(`ShieldSearchNudges: Unknown event: ${event.type}`);
