@@ -35,6 +35,7 @@ const STRING_TIP_GENERAL = "urlbarSearchTip.onboarding";
 const STRING_TIP_REDIRECT = "urlbarSearchTip.engineIsCurrentPage";
 const TIP_PANEL_ID = "shield-search-nudges-panel";
 const TIP_ANCHOR_SELECTOR = "#identity-icon";
+const TIP_PANEL_HIDING_MS = 200;
 
 /**
  * Return a browser window as soon as possible. If there's no window available
@@ -386,8 +387,19 @@ class Feature {
         if (this._shownPanels.size == 2) {
           this.stopTrackingForThisSession();
         }
+        // Toggle the panel as set to not be hiding (transition ended as well).
+        window.setTimeout(() => {
+          this._panelHiding = false;
+          if (this._showOnceHidden) {
+            this._maybeShowTip(this._showOnceHidden);
+            delete this._showOnceHidden;
+          }
+        }, TIP_PANEL_HIDING_MS);
         break;
       }
+      case "popuphiding":
+        this._panelHiding = true;
+        break;
       case "TabSelect": {
         if (event.target.linkedBrowser &&
             event.target.linkedBrowser.currentURI) {
@@ -551,6 +563,11 @@ class Feature {
       return;
     }
 
+    if (this._panelHiding) {
+      this._showOnceHidden = type;
+      return;
+    }
+
     this._shownPanels.add(type);
 
     // Show the panel only if we've got the right study variation set to do so.
@@ -563,6 +580,7 @@ class Feature {
 
       panel.openPopup(anchor, "bottomcenter topleft", 0, 0);
       panel.addEventListener("popuphidden", this, {once: true});
+      panel.addEventListener("popuphiding", this, {once: true});
       window.gURLBar.inputField.addEventListener("mousedown", this);
       window.gURLBar.inputField.addEventListener("keydown", this);
       this._URLBarWasClicked = false;
