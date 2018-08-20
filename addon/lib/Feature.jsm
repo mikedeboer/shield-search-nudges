@@ -532,6 +532,8 @@ class Feature {
       return;
     }
 
+    this._shownPanels.add(type);
+
     // Show the panel only if we've got the right study variation set to do so.
     // If it's set to 'noshow', it means that this user is in the control group.
     if (this.variation.name == "doshow") {
@@ -546,7 +548,8 @@ class Feature {
       window.gURLBar.inputField.addEventListener("keydown", this);
       this._URLBarWasClicked = false;
       this.shownPanelType = type;
-      this._shownPanels.add(type);
+    } else if (this._shownPanels.size == 2) {
+      this.stopTrackingForThisSession();
     }
 
     // Increment the counter that keeps track of the number of times this popup
