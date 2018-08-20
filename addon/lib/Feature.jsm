@@ -355,8 +355,8 @@ class Feature {
         }
         // Hide the panel when the button is clicked.
         if (panel && panel.hidePopup) {
+          this._hiddenByButtonClick = true;
           panel.hidePopup();
-          this.telemetry({event: eventPrefix + "hidden-buttonclick"});
         }
         break;
       }
@@ -367,7 +367,10 @@ class Feature {
         const currentURI = window.gBrowser.currentURI && window.gBrowser.currentURI.spec;
         const newTabWorkaround = this._URLBarWasClicked &&
           (currentURI == "about:home" || currentURI == "about:newtab");
-        if (newTabWorkaround || (window.gURLBar.focused && focusMethod &&
+
+        if (this._hiddenByButtonClick) {
+          this.telemetry({event: eventPrefix + "hidden-buttonclick"});
+        } else if (newTabWorkaround || (window.gURLBar.focused && focusMethod &&
                                  !!(focusMethod & Services.focus.FLAG_BYMOUSE))) {
           Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, true);
           this.telemetry({event: eventPrefix + "hidden-awesomebarclick"});
@@ -377,6 +380,7 @@ class Feature {
         window.gURLBar.inputField.removeEventListener("mousedown", this);
         window.gURLBar.inputField.removeEventListener("keydown", this);
         this._URLBarWasClicked = false;
+        this._hiddenByButtonClick = false;
         this.shownPanelType = null;
         // Once we've shown both panel types once, that's enough for this session.
         if (this._shownPanels.size == 2) {
