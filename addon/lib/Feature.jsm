@@ -9,6 +9,8 @@ Cu.importGlobalProperties(["fetch"]);
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.defineModuleGetter(this, "AddonManager",
   "resource://gre/modules/AddonManager.jsm");
+ChromeUtils.defineModuleGetter(this, "AppConstants",
+  "resource://gre/modules/AppConstants.jsm");
 ChromeUtils.defineModuleGetter(this, "clearInterval",
   "resource://gre/modules/Timer.jsm");
 ChromeUtils.defineModuleGetter(this, "setInterval",
@@ -26,6 +28,7 @@ const PREF_NUDGES_SHOWN_COUNT = "extensions.shield-search-nudges.shown_count";
 const PREF_NUDGES_DISMISSED_CLICKAB = "extensions.shield-search-nudges.clicked-awesomebar";
 const PREF_NUDGES_DISMISSED_WITHOK = "extensions.shield-search-nudges.oked";
 const PREF_NUDGES_INSTALL_TIME = "extensions.shield-search-nudges.installed_at";
+const PREF_NUDGES_BROWSER_VERSION = "extensions.shield-search-nudges.browser_version";
 const EXPIRY_TIMESPAN_MS = 3628800000; // 6 weeks.
 const SEARCH_ENGINE_TOPIC = "browser-search-engine-modified";
 const STRING_TIP_GENERAL = "urlbarSearchTip.onboarding";
@@ -218,6 +221,16 @@ class Feature {
     return this._searchEngineCurrentOrigin;
   }
 
+  get browserVersion() {
+    if (this._browserVersion) {
+      return this._browserVersion;
+    }
+
+    this._browserVersion = parseInt(AppConstants.MOZ_APP_VERSION, 10);
+    Services.prefs.setBoolPref(PREF_NUDGES_BROWSER_VERSION, this._browserVersion);
+    return this._browserVersion;
+  }
+
   /**
    * Resets the pref to their default values.
    *
@@ -227,14 +240,15 @@ class Feature {
   resetPrefs(permanently = false) {
     if (permanently) {
       for (const pref of [PREF_NUDGES_SHOWN_COUNT, PREF_NUDGES_INSTALL_TIME,
-        PREF_NUDGES_DISMISSED_CLICKAB, PREF_NUDGES_DISMISSED_WITHOK]) {
+        PREF_NUDGES_DISMISSED_CLICKAB, PREF_NUDGES_DISMISSED_WITHOK,
+        PREF_NUDGES_BROWSER_VERSION]) {
         Services.prefs.clearUserPref(pref);
       }
     } else {
-      Services.prefs.setIntPref(PREF_NUDGES_SHOWN_COUNT, 0);
-      Services.prefs.setIntPref(PREF_NUDGES_INSTALL_TIME, Date.now() / 1000);
       Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_CLICKAB, false);
       Services.prefs.setBoolPref(PREF_NUDGES_DISMISSED_WITHOK, false);
+      Services.prefs.setIntPref(PREF_NUDGES_INSTALL_TIME, Date.now() / 1000);
+      Services.prefs.setIntPref(PREF_NUDGES_SHOWN_COUNT, 0);
     }
   }
 
@@ -405,7 +419,8 @@ class Feature {
       }
     }
 
-    if (this._showOnceStarted) {
+    if (this._showOnceStarted &&
+        Services.prefs.getIntPref(PREF_NUDGES_BROWSER_VERSION, this.browserVersion) == this.browserVersion) {
       this._maybeShowTip(this._showOnceStarted);
       delete this._showOnceStarted;
     }
