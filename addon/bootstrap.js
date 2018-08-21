@@ -137,7 +137,7 @@ this.Bootstrap = {
     if (isUninstall && !studyUtils._isEnding) {
       // we are the first 'uninstall' requestor => must be user action.
       this.log.debug("probably: user requested shutdown");
-      studyUtils.endStudy({ reason: "user-disable" });
+      await studyUtils.endStudy({ reason: "user-disable" });
     }
 
     // normal shutdown, or 2nd uninstall request

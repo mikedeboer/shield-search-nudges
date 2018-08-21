@@ -37,7 +37,14 @@ var config = {
      * - If there is no key for an endStudy reason, no url will open.
      * - usually surveys, orientations, explanations
      */
-    endings: {},
+    endings: {
+      "user-disable": {
+        baseUrl: "https://qsurvey.mozilla.com/s3/Nudges-Doorhanger",
+      },
+      expired: {
+        baseUrl: "https://qsurvey.mozilla.com/s3/Nudges-Doorhanger",
+      },
+    },
     telemetry: {
       send: true, // assumed false. Actually send pings?
       removeTestingFlag: false, // Marks pings to be discarded, set true for to have the pings processed in the pipeline
