@@ -134,10 +134,6 @@ this.Bootstrap = {
     const isUninstall =
       reason === studyUtils.REASONS.ADDON_UNINSTALL ||
       reason === studyUtils.REASONS.ADDON_DISABLE;
-    if (isUninstall) {
-      this.log.debug("uninstall or disable");
-    }
-
     if (isUninstall && !studyUtils._isEnding) {
       // we are the first 'uninstall' requestor => must be user action.
       this.log.debug("probably: user requested shutdown");
@@ -153,6 +149,17 @@ this.Bootstrap = {
     if (this.feature) {
       await this.feature.shutdown(isUninstall);
       delete this.feature;
+    }
+
+    if (isUninstall) {
+      this.log.debug("uninstall or disable");
+      // An in-scope AddonManager may already be garbage-collected at this point,
+      // so we need to import it here to be sure.
+      const addon = await ChromeUtils.import("resource://gre/modules/AddonManager.jsm", {})
+        .AddonManager.getAddonByID(addonData.id);
+      // This is needed even for onUninstalling, because it nukes the addon
+      // from UI. If we don't do this, the user has a chance to "undo".
+      addon.uninstall();
     }
 
     // Unload addon-specific modules

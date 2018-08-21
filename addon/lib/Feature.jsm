@@ -110,9 +110,6 @@ class Feature {
   async start(reason) {
     this.log.debug("Feature start");
 
-    // Listen for addon disabling or uninstall.
-    AddonManager.addAddonListener(this);
-
     // Perform something only during INSTALL = a new study period begins.
     if (reason === "ADDON_INSTALL") {
       this.resetPrefs();
@@ -153,6 +150,31 @@ class Feature {
     });
   }
 
+  /**
+   * Called at end of study, and if the user disables the study or it gets
+   * uninstalled by other means.
+   *
+   * @param {Boolean} [isUninstall]
+   */
+  async shutdown(isUninstall = false) {
+    if (isUninstall) {
+      this.resetPrefs(true);
+    }
+
+    this.stopTrackingForThisSession();
+
+    // If the panel was created in this window before, let's make sure to clean it up.
+    const winEnum = Services.wm.getEnumerator("navigator:browser");
+    while (winEnum.hasMoreElements()) {
+      const win = winEnum.getNext();
+      if (win.document && win.document.getElementById(TIP_PANEL_ID) && !win.closed) {
+        const {panel, panelButton} = this._ensurePanel(win);
+        panelButton.removeEventListener("command", this);
+        panel.remove();
+      }
+    }
+  }
+
   _addListenersForWindow(window) {
     window.gBrowser.addTabsProgressListener(this);
     window.gBrowser.tabContainer.addEventListener("TabSelect", this);
@@ -161,29 +183,6 @@ class Feature {
   _removeListenersFromWindow(window) {
     window.gBrowser.removeTabsProgressListener(this);
     window.gBrowser.tabContainer.removeEventListener("TabSelect", this);
-  }
-
-  /* START AddonListener interface methods. */
-  onUninstalling(addon) {
-    this.handleDisableOrUninstall(addon);
-  }
-
-  onDisabled(addon) {
-    this.handleDisableOrUninstall(addon);
-  }
-  /* END AddonListener interface methods. */
-
-  handleDisableOrUninstall(addon) {
-    if (addon.id !== this.studyUtils.config.addon.id) {
-      return;
-    }
-    // The in-scope AddonManager may already be garbage-collected at this point,
-    // so we need to import it again to be sure.
-    ChromeUtils.import("resource://gre/modules/AddonManager.jsm", {})
-      .AddonManager.removeAddonListener(this);
-    // This is needed even for onUninstalling, because it nukes the addon
-    // from UI. If we don't do this, the user has a chance to "undo".
-    addon.uninstall();
   }
 
   /**
@@ -272,32 +271,6 @@ class Feature {
           continue;
         }
         this._removeListenersFromWindow(win);
-      }
-    }
-  }
-
-  /**
-   * Called at end of study, and if the user disables the study or it gets
-   * uninstalled by other means.
-   *
-   * @param {Boolean} [isUninstall]
-   */
-  async shutdown(isUninstall = false) {
-    if (isUninstall) {
-      this.resetPrefs(true);
-    }
-
-    this.stopTrackingForThisSession();
-    AddonManager.removeAddonListener(this);
-
-    // If the panel was created in this window before, let's make sure to clean it up.
-    const winEnum = Services.wm.getEnumerator("navigator:browser");
-    while (winEnum.hasMoreElements()) {
-      const win = winEnum.getNext();
-      if (win.document && win.document.getElementById(TIP_PANEL_ID) && !win.closed) {
-        const {panel, panelButton} = this._ensurePanel(win);
-        panelButton.removeEventListener("command", this);
-        panel.remove();
       }
     }
   }
