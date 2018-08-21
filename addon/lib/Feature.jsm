@@ -110,6 +110,9 @@ class Feature {
   async start(reason) {
     this.log.debug("Feature start");
 
+    // Listen for addon disabling or uninstall.
+    AddonManager.addAddonListener(this);
+
     // Perform something only during INSTALL = a new study period begins.
     if (reason === "ADDON_INSTALL") {
       this.resetPrefs();
@@ -128,9 +131,6 @@ class Feature {
 
     // Listen for new windows being opened
     Services.ww.registerNotification(this);
-
-    // Listen for addon disabling or uninstall.
-    AddonManager.addAddonListener(this);
 
     this._startingUp = true;
 
