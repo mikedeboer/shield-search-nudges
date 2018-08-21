@@ -75,7 +75,7 @@
     "lint:fixpack": "fixpack",
     "lint:nsp": "nsp check",
     "postformat": "npm run eslint-fix",
-    "prebuild": "cp node_modules/shield-studies-addon-utils/dist/StudyUtils.jsm addon/",
+    "prebuild": "bash ./bin/prebuild.sh",
     "sign": "echo 'TBD, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1407757'",
     "test": "npm-run-all test:*",
     "test:functional": "export XPI=dist/linked-addon.xpi && npm run build && mocha test/functional_tests.js --retry 2",

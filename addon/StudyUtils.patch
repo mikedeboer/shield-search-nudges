@@ -1,0 +1,4 @@
+713a714,716
+>     if (!("triggeringPrincipal" in params)) {
+>       params.triggeringPrincipal = Services.scriptSecurityManager.createNullPrincipal({});
+>     }
