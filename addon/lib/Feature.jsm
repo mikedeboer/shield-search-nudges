@@ -193,7 +193,7 @@ class Feature {
     await this.studyUtils.endStudy({ reason: "expired" });
     const addon = await AddonManager.getAddonByID(this.studyUtils.config.addon.id);
     if (addon) {
-      this.handleDisableOrUninstall(addon);
+      addon.uninstall();
     }
   }
 
