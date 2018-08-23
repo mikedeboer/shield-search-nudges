@@ -159,7 +159,9 @@ this.Bootstrap = {
         .AddonManager.getAddonByID(addonData.id);
       // This is needed even for onUninstalling, because it nukes the addon
       // from UI. If we don't do this, the user has a chance to "undo".
-      addon.uninstall();
+      if (addon) {
+        addon.uninstall();
+      }
     }
 
     // Unload addon-specific modules

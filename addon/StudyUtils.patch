@@ -1,4 +1,8 @@
-713a714,716
+714c714,718
+<     if (!Services.wm.getMostRecentWindow("navigator:browser").gBrowser) {
+---
 >     if (!("triggeringPrincipal" in params)) {
 >       params.triggeringPrincipal = Services.scriptSecurityManager.createNullPrincipal({});
 >     }
+>     const window = Services.wm.getMostRecentWindow("navigator:browser");
+>     if (!window || !window.gBrowser) {
